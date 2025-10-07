@@ -1,3 +1,8 @@
-menu "Zephyr"
+menu "zephyr"
+
+config HELLO_TIMER_INTERV
+    int "Intervalo do Timer EM MILISSEGUNDOS"
+    default 1000
+
 source "Kconfig.zephyr"
 endmenu
