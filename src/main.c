@@ -1,24 +1,27 @@
-#include <zephyr.h>
-#include <zephyr/sys/printk.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/printk.h>
 
-#define INTERVAL_MS 10000  // Intervalo em milissegundos
+LOG_MODULE_REGISTER(hello_timer, LOG_LEVEL_DBG);
 
-LOG_MODULE_REGISTER(main);
+static struct k_timer hello_timer;
 
-void timer_handler(struct k_timer *dummy) {
-    LOG_INF("Hello world com timer de %d ms", INTERVAL_MS);
-    LOG_DBG("Hello world com timer de %d ms", INTERVAL_MS);
-    LOG_ERR("Hello world com timer de %d ms", INTERVAL_MS);
+static void hello_timer_handler(struct k_timer *timer_id)
+{
+	ARG_UNUSED(timer_id);
+
+	static int cycle_count;
+	cycle_count++;
+
+	LOG_INF("Hello World #%d", cycle_count);
+	printk("Hello World #%d (printk)\n", cycle_count);
+	LOG_DBG("Timer interval is %d ms", CONFIG_HELLO_TIMER_INTERV);
 }
 
-// Define um timer
-K_TIMER_DEFINE(my_timer, timer_handler, NULL);
-
-void main(void)
+int main(void)
 {
-    LOG_INF("Sistema inicializado. Intervalo do timer: %d ms", INTERVAL_MS);
+	k_timer_init(&hello_timer, hello_timer_handler, NULL);
+	k_timer_start(&hello_timer, K_MSEC(CONFIG_HELLO_TIMER_INTERV), K_MSEC(CONFIG_HELLO_TIMER_INTERV));
 
-    // Inicializa o timer para disparar periodicamente
-    k_timer_start(&my_timer, K_MSEC(INTERVAL_MS), K_MSEC(INTERVAL_MS));
+	return 0;
 }

@@ -1,8 +1,10 @@
-menu "zephyr"
+source "Kconfig.zephyr"
+
+menu "embedded_systems_project"
 
 config HELLO_TIMER_INTERV
     int "Intervalo do Timer EM MILISSEGUNDOS"
     default 1000
-
-source "Kconfig.zephyr"
+    help 
+        intervalo em milissegundos
 endmenu
