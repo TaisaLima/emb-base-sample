@@ -9,9 +9,9 @@ static void handler(struct k_timer *timer_id)
 {
 	ARG_UNUSED(timer_id);
 
-	LOG_INF("Hello World");
 	printk("Hello World \n");
 	LOG_DBG("Timer interval is %d ms", CONFIG_HELLO_TIMER_INTERV);
+	LOG_INF("Hello World");
 }
 
 int main(void)
