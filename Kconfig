@@ -1,23 +1,16 @@
 source "Kconfig.zephyr"
 
-menu "Configurações do Projeto - Botão + PWM"
 
-config EMBEDDED_SYSTEMS_PROJECT
-    bool "Ativar projeto de sistemas embarcados"
-    default y
+menu "Environmental Monitoring System Configuration"
 
-config USE_PWM
-    bool "Usar PWM para controlar o brilho do LED"
+config CLIMATE_MONITOR
+    bool "Enable environmental monitoring system"
     default y
+    
     help
-        Quando ativado, o LED será controlado por PWM,
-        permitindo variação gradual de brilho.
+    Enables the system that collects temperature and humidity data,
+    validates the values, and displays the results in the log. Warns if the values
+    are outside an acceptable range.
 
-config USE_BUTTON
-    bool "Usar botão para alternar entre modos"
-    default y
-    help
-        Quando ativado, o botão será usado para alternar
-        entre o modo digital (on/off) e o modo PWM (variação de brilho).
 
-endmenu
+endmenu 

@@ -1,107 +1,137 @@
 #include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/sys/printk.h>
-#include <zephyr/drivers/uart.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 
-#define BLINK_TIME_MS   400
-#define FADE_STEPS      50 
-#define FADE_DELAY_US   (10000 / FADE_STEPS)
+LOG_MODULE_REGISTER(Sensors_output);
 
-#define Led2_NODE DT_ALIAS(led2)
-#define LED1_NODE DT_ALIAS(led1)
-#define BUTTON_NODE DT_ALIAS(sw0)
+#define RANGE_TEMP_MIN 18
+#define RANGE_TEMP_MAX 30
+#define RANGE_HUM_MIN 40
+#define RANGE_HUM_MAX 70
 
-static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(Led2_NODE, gpios);
-static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
-static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(BUTTON_NODE, gpios);
-static const struct device* const console_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+#define STACK_SIZE 1024
+#define PRIORITY 5
 
-static struct gpio_callback button_cb;
-static volatile bool pwm_mode = false;
+typedef enum {
+    SENSOR_HUMIDITY = 0,
+    SENSOR_TEMPERATURE,
+} sensor_kind_t;
 
-void soft_pwm_set(int duty_cycle_step) {
-    
-    int high_us = duty_cycle_step * FADE_DELAY_US;
-    int low_us = (FADE_STEPS - duty_cycle_step) * FADE_DELAY_US;
-    
-    // Simula um pulso único
-    gpio_pin_set_dt(&led1, 1);
-    k_usleep(high_us);
-    gpio_pin_set_dt(&led1, 0);
-    k_usleep(low_us);
+typedef struct {
+    sensor_kind_t kind;
+    union {
+        uint8_t humidity;
+        int8_t temperature;
+    } value;
+} sensor;
 
-}
+K_MSGQ_DEFINE(queue_raw, sizeof(sensor), 10, 4);
+K_MSGQ_DEFINE(queue_valid, sizeof(sensor), 10, 4);
 
-void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+static sensor generate_sample(sensor_kind_t kind)
 {
-    pwm_mode = !pwm_mode;
-    
-    if (pwm_mode) {
-        gpio_pin_set_dt(&led2, 0); 
+    sensor sample;
+    sample.kind = kind;
+
+    if (kind == SENSOR_HUMIDITY) {
+        sample.value.humidity = sys_rand32_get() % 101;
     } else {
-        gpio_pin_set_dt(&led1, 0); // Desliga o LED de fade
+        sample.value.temperature = (sys_rand32_get() % 41);  
     }
 
-    printk("Botão pressionado → modo: %s\n", pwm_mode ? "PWM (fade)" : "Digital (blink)");
+    return sample;
 }
+
+static void humidity_producer(void)
+{
+    sensor s = generate_sample(SENSOR_HUMIDITY);
+    k_msgq_put(&queue_raw, &s, K_FOREVER);
+}
+
+static void temperature_producer(void)
+{
+    sensor s = generate_sample(SENSOR_TEMPERATURE);
+    k_msgq_put(&queue_raw, &s, K_FOREVER);
+}
+
+static int filter_task(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    sensor sample;
+
+    while (1) {
+        if (k_msgq_get(&queue_raw, &sample, K_FOREVER) == 0) {
+            bool valid = false;
+
+            switch (sample.kind) {
+            case SENSOR_HUMIDITY:
+                if (sample.value.humidity >= RANGE_HUM_MIN &&
+                    sample.value.humidity <= RANGE_HUM_MAX) {
+                    valid = true;
+                } else {
+                    LOG_WRN("Humidity out of acceptable values: %d%%", sample.value.humidity);
+                }
+                break;
+
+            case SENSOR_TEMPERATURE:
+                if (sample.value.temperature >= RANGE_TEMP_MIN &&
+                    sample.value.temperature <= RANGE_TEMP_MAX) {
+                    valid = true;
+                } else {
+                    LOG_WRN("Temperature out of acceptable values: %d°C", sample.value.temperature);
+                }
+                break;
+            }
+
+            if (valid) {
+                k_msgq_put(&queue_valid, &sample, K_FOREVER);
+            }
+        }
+    }
+
+    return 0;
+}
+
+static int consumer_task(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    sensor s;
+
+    while (1) {
+        if (k_msgq_get(&queue_valid, &s, K_FOREVER) == 0) {
+            if (s.kind == SENSOR_HUMIDITY) {
+                LOG_INF("Humidity: %d%%", s.value.humidity);
+            } else {
+                LOG_INF("Temperature: %d°C", s.value.temperature);
+            }
+        }
+    }
+
+    return 0;
+}
+
+K_THREAD_DEFINE(tid_filter, STACK_SIZE, filter_task, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(tid_consumer, STACK_SIZE, consumer_task, NULL, NULL, NULL, PRIORITY, 0, 0);
+
 
 int main(void)
 {
+    LOG_INF("Sistema de sensores iniciado.");
 
-    unsigned char c;
-
-    if (!device_is_ready(led2.port)) {
-        printk("Error: Led2 port is not ready\n");
-        return 0;
-    }
-    gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
-
-    if (!device_is_ready(led1.port)) {
-        printk("Error: Led1 port is not ready\n");
-        return 0;
-    }
-    gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
-
-
-    if (!device_is_ready(button.port)) {
-        printk("Error: button port is not ready\n");
-        return 0;
-    }
-    gpio_pin_configure_dt(&button, GPIO_INPUT);
-    gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
-
-    gpio_init_callback(&button_cb, button_pressed, BIT(button.pin));
-    gpio_add_callback(button.port, &button_cb);
-
-    printk("Press the button or ENTER to switch mode\n");
+    const uint32_t interval_ms = 500;
 
     while (1) {
+        humidity_producer();
+        k_msleep(interval_ms);
 
-        if (!uart_poll_in(console_dev, &c) && (c == '\n' || c == '\r')) {
-            button_pressed(button.port, &button_cb, BIT(button.pin));
-        }
-        
-        if (!pwm_mode) {
-            // Modo Digital (Blink)
-            gpio_pin_set_dt(&led2, 1);
-            k_msleep(BLINK_TIME_MS);
-            gpio_pin_set_dt(&led2, 0);
-            k_msleep(BLINK_TIME_MS);
-
-        } else {
-            // Modo Soft-PWM (Fade)
-            
-            // Fade-in
-            for (int step = 0; step <= FADE_STEPS; step++) {
-                soft_pwm_set(step);
-            }
-            // Fade-out
-            for (int step = FADE_STEPS; step >= 0; step--) {
-                soft_pwm_set(step);
-            }
-        }
+        temperature_producer();
+        k_msleep(interval_ms);
     }
 
     return 0;
