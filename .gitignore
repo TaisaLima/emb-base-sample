@@ -8,6 +8,8 @@
 *.swo
 *~
 
+eval_ssh
+
 # Emacs
 \#*\#
 

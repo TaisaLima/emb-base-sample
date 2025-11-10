@@ -1,10 +1,23 @@
 source "Kconfig.zephyr"
 
-menu "embedded_systems_project"
+menu "Configurações do Projeto - Botão + PWM"
 
-config HELLO_TIMER_INTERV
-    int "Intervalo do Timer EM MILISSEGUNDOS"
-    default 1000
-    help 
-        intervalo em milissegundos
+config EMBEDDED_SYSTEMS_PROJECT
+    bool "Ativar projeto de sistemas embarcados"
+    default y
+
+config USE_PWM
+    bool "Usar PWM para controlar o brilho do LED"
+    default y
+    help
+        Quando ativado, o LED será controlado por PWM,
+        permitindo variação gradual de brilho.
+
+config USE_BUTTON
+    bool "Usar botão para alternar entre modos"
+    default y
+    help
+        Quando ativado, o botão será usado para alternar
+        entre o modo digital (on/off) e o modo PWM (variação de brilho).
+
 endmenu

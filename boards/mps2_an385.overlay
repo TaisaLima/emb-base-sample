@@ -2,21 +2,33 @@
 
 / {
     aliases {
-        led0 = &led0;
-		led1 = &led1;
+        led2 = &led2_digital;
+        sw0  = &button0;
     };
 
     leds {
-		compatible = "gpio-leds";
+        compatible = "gpio-leds";
 
-		led0: led0 {
-			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
-			label = "GNSS LED";
-		};
+        led2_digital: led2_digital {
+            gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+            label = "LED Digital (Blink)";
+        };
 
-		led1: led1 {
-			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
-			label = "LTE LED";
-		};
-	};
+        led1_digital: led1_digital { 
+            gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+            label = "LED Soft-PWM (Fade)";
+        };
+
+ 
+    };
+
+
+    buttons {
+        compatible = "gpio-keys";
+
+        button0: button_0 {
+            gpios = <&gpio0 2 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+            label = "User Button (sw0)";
+        };
+    };
 };
