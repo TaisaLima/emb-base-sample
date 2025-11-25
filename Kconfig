@@ -1,23 +1,38 @@
-source "Kconfig.zephyr"
+# Kconfig - Radar System Configuration
 
-menu "Configurações do Projeto - Botão + PWM"
+menu "Configuração de Sistema de Radar"
 
-config EMBEDDED_SYSTEMS_PROJECT
-    bool "Ativar projeto de sistemas embarcados"
-    default y
-
-config USE_PWM
-    bool "Usar PWM para controlar o brilho do LED"
-    default y
+config RADAR_SENSOR_DISTANCE_MM
+    int "Distância entre os sensores (MM)"
+    default 500
+    range 100 2000
     help
-        Quando ativado, o LED será controlado por PWM,
-        permitindo variação gradual de brilho.
+      Distancia entre os dois sensores magnéticos usados para calcular a velocidade.
 
-config USE_BUTTON
-    bool "Usar botão para alternar entre modos"
-    default y
+config RADAR_SPEED_LIMIT_LIGHT_KMH
+    int "Limite de velocidade para veículos leves (km/h)"
+    default 60
+    range 30 100
     help
-        Quando ativado, o botão será usado para alternar
-        entre o modo digital (on/off) e o modo PWM (variação de brilho).
+      Velocidade máxima permitida para veículos leves (2 eixos).
 
-endmenu
+config RADAR_SPEED_LIMIT_HEAVY_KMH
+    int "Limite de Velocidade para veículos pesados (km/h)"
+    default 40
+    range 20 80
+    help
+      Velocidade máxima permitida para veículos pesados (3+ eixos).
+
+config RADAR_WARNING_THRESHOLD_PERCENT
+    int "Percentual de limite de velocidade que dispara o aviso"
+    default 90
+    range 80 99
+    help
+      Percentual de limite de velocidade que aciona o aviso amarelo na tela.
+
+config RADAR_CAMERA_FAILURE_RATE_PERCENT
+    int "Taxa de simulaçao de Falha da Camera (0-100%)"
+    default 10
+    range 0 100
+    help
+      Porcetagem de chance da camera simular uma falha.
